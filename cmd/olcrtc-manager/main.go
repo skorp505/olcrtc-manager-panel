@@ -141,11 +141,10 @@ type olcrtcRuntimeConfig struct {
 	SOCKS  olcrtcSocksConfig  `yaml:"socks,omitempty"`
 	VP8    *olcrtcVP8Config   `yaml:"vp8,omitempty"`
 	SEI    *olcrtcSEIConfig   `yaml:"sei,omitempty"`
-	Video  *olcrtcVideoConfig `yaml:"video,omitempty"`
-	Gen    *olcrtcGenConfig   `yaml:"gen,omitempty"`
-	Data   string             `yaml:"data,omitempty"`
-	Debug  bool               `yaml:"debug,omitempty"`
-	FFmpeg string             `yaml:"ffmpeg,omitempty"`
+	Video *olcrtcVideoConfig `yaml:"video,omitempty"`
+	Gen   *olcrtcGenConfig   `yaml:"gen,omitempty"`
+	Data  string             `yaml:"data,omitempty"`
+	Debug bool               `yaml:"debug,omitempty"`
 }
 
 type olcrtcAuthConfig struct {
@@ -188,8 +187,6 @@ type olcrtcVideoConfig struct {
 	Width      int    `yaml:"width,omitempty"`
 	Height     int    `yaml:"height,omitempty"`
 	FPS        int    `yaml:"fps,omitempty"`
-	Bitrate    string `yaml:"bitrate,omitempty"`
-	HW         string `yaml:"hw,omitempty"`
 	QRSize     int    `yaml:"qr_size,omitempty"`
 	QRRecovery string `yaml:"qr_recovery,omitempty"`
 	Codec      string `yaml:"codec,omitempty"`
@@ -1813,8 +1810,6 @@ func applyTransportPayload(cfg *olcrtcRuntimeConfig, transport Transport) error 
 		if err := setPayloadNonNegativeInt(payload, "video-tile-rs", &video.TileRS); err != nil {
 			return err
 		}
-		video.Bitrate = payload["video-bitrate"]
-		video.HW = payload["video-hw"]
 		video.Codec = payload["video-codec"]
 		video.QRRecovery = payload["video-qr-recovery"]
 		if video != (olcrtcVideoConfig{}) {
@@ -3192,7 +3187,7 @@ func validatePayload(t Transport) error {
 		"datachannel":  {},
 		"vp8channel":   {"vp8-fps": {}, "vp8-batch": {}},
 		"seichannel":   {"fps": {}, "batch": {}, "frag": {}, "ack-ms": {}},
-		"videochannel": {"video-w": {}, "video-h": {}, "video-fps": {}, "video-bitrate": {}, "video-hw": {}, "video-codec": {}, "video-qr-size": {}, "video-qr-recovery": {}, "video-tile-module": {}, "video-tile-rs": {}},
+		"videochannel": {"video-w": {}, "video-h": {}, "video-fps": {}, "video-codec": {}, "video-qr-size": {}, "video-qr-recovery": {}, "video-tile-module": {}, "video-tile-rs": {}},
 	}
 
 	keys, ok := allowed[t.Type]

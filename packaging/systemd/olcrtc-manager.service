@@ -1,6 +1,6 @@
 [Unit]
 Description=OlcRTC Manager Panel
-Documentation=https://github.com/BigDaddy3334/olcrtc-manager-panel
+Documentation=https://github.com/skorp505/olcrtc-manager-panel
 After=network-online.target
 Wants=network-online.target
 

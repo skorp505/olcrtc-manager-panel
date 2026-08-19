@@ -112,12 +112,10 @@ func TestServerConfigAllowsVideoAutoQRSize(t *testing.T) {
 	loc.Transport = Transport{
 		Type: "videochannel",
 		Payload: map[string]string{
-			"video-w":       "1080",
-			"video-h":       "1080",
-			"video-fps":     "60",
-			"video-bitrate": "5000k",
-			"video-hw":      "none",
-			"video-codec":   "qrcode",
+			"video-w":     "1080",
+			"video-h":     "1080",
+			"video-fps":   "60",
+			"video-codec": "qrcode",
 			"video-qr-size": "0",
 			"video-tile-rs": "0",
 		},

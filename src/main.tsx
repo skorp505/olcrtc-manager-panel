@@ -222,13 +222,11 @@ const payloadFields: Record<string, Array<{ key: string; label: string; defaultV
     { key: "video-w", label: "Width", defaultValue: "1080" },
     { key: "video-h", label: "Height", defaultValue: "1080" },
     { key: "video-fps", label: "FPS", defaultValue: "60" },
-    { key: "video-bitrate", label: "Bitrate", defaultValue: "5000k" },
     { key: "video-codec", label: "Codec", defaultValue: "qrcode" },
-    { key: "video-hw", label: "Hardware accel", defaultValue: "none" },
     { key: "video-qr-size", label: "QR size", defaultValue: "0" },
     { key: "video-qr-recovery", label: "QR recovery", defaultValue: "low" },
     { key: "video-tile-module", label: "Tile module", defaultValue: "4" },
-    { key: "video-tile-rs", label: "Tile RS", defaultValue: "20" },
+    { key: "video-tile-rs", label: "Tile RS", defaultValue: "0" },
   ],
 };
 
