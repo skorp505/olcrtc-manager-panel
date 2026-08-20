@@ -399,6 +399,45 @@ show_existing_info() {
 	fi
 }
 
+migrate_config() {
+	[ -f "$CONFIG_PATH" ] || return 0
+
+	local changed=0
+
+	# remove deprecated "data" field from locations (was causing "open names file" errors)
+	if grep -q '"data"' "$CONFIG_PATH" 2>/dev/null; then
+		local tmp="${CONFIG_PATH}.migrate"
+		if python3 -c "
+import json, sys
+with open('$CONFIG_PATH') as f:
+    cfg = json.load(f)
+found = False
+for client in cfg.get('clients', []):
+    for loc in client.get('locations', []):
+        if 'data' in loc:
+            del loc['data']
+            found = True
+if found:
+    with open('$tmp', 'w') as f:
+        json.dump(cfg, f, indent=2)
+    sys.exit(0)
+sys.exit(1)
+" 2>&1; then
+			mv "$tmp" "$CONFIG_PATH"
+			chmod 0600 "$CONFIG_PATH"
+			changed=1
+			log "migrated config: removed deprecated data fields"
+		else
+			rm -f "$tmp"
+			log "warning: could not migrate config; manual cleanup may be needed"
+		fi
+	fi
+
+	if [ "$changed" = "1" ]; then
+		log "config migrated: $CONFIG_PATH"
+	fi
+}
+
 do_update() {
 	need_root
 	install_packages
@@ -406,6 +445,7 @@ do_update() {
 	ensure_build_memory
 
 	show_existing_info
+	migrate_config
 	apply_config_port
 	write_tls_cert_if_missing
 	write_panel_env_if_missing

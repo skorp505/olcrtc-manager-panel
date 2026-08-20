@@ -110,7 +110,7 @@ type Location struct {
 	Carrier   string      `json:"carrier"`
 	Transport Transport   `json:"transport"`
 	Link      string      `json:"link"`
-	Data      string      `json:"data"`
+	Data      string      `json:"data,omitempty"`
 	DNS       string      `json:"dns"`
 	Proxy     Socks5Proxy `json:"proxy,omitempty"`
 }
