@@ -23,6 +23,7 @@ PANEL_REPO="${PANEL_REPO:-https://github.com/skorp505/olcrtc-manager-panel.git}"
 PANEL_REF="${PANEL_REF:-main}"
 OLCRTC_REPO="${OLCRTC_REPO:-https://github.com/openlibrecommunity/olcrtc.git}"
 OLCRTC_REF="${OLCRTC_REF:-master}"
+UPDATE_MODE="${UPDATE_MODE:-}"
 GO_VERSION="${GO_VERSION:-1.26.3}"
 MIN_BUILD_MEMORY_MB="${MIN_BUILD_MEMORY_MB:-2048}"
 AUTO_SWAP="${AUTO_SWAP:-1}"
@@ -379,8 +380,111 @@ sync_sources() {
 	tar --exclude='.git' --exclude='node_modules' -C "$src" -cf - . | tar -C "$INSTALL_SRC_DIR" -xf -
 }
 
+detect_existing_install() {
+	if [ -x /usr/local/bin/olcrtc-manager ] && [ -f "$CONFIG_PATH" ] && systemctl is-enabled olcrtc-manager >/dev/null 2>&1; then
+		return 0
+	fi
+	return 1
+}
+
+show_existing_info() {
+	local port
+	port="$(read_config_port)"
+	log "existing installation detected"
+	log "  binary:  /usr/local/bin/olcrtc-manager"
+	log "  config:  $CONFIG_PATH"
+	log "  env:     $PANEL_ENV_PATH"
+	if [ -n "$port" ]; then
+		log "  port:    $port"
+	fi
+}
+
+do_update() {
+	need_root
+	install_packages
+	install_go
+	ensure_build_memory
+
+	show_existing_info
+	apply_config_port
+	write_tls_cert_if_missing
+	write_panel_env_if_missing
+	detect_manager_features
+
+	if [ "$PANEL_SUPPORTS_ADMIN_PATH" = "1" ] && [ -f "$PANEL_ENV_PATH" ]; then
+		DISPLAY_ADMIN_PATH="$(read_env_value OLCRTC_MANAGER_ADMIN_PATH "$PANEL_ENV_PATH")"
+		DISPLAY_ADMIN_PATH="${DISPLAY_ADMIN_PATH:-/admin}"
+	else
+		DISPLAY_ADMIN_PATH="/admin"
+	fi
+
+	if [ "$PANEL_SUPPORTS_TLS" = "1" ] && [ "$PANEL_TLS" = "1" ] && [ -f "$TLS_CERT_PATH" ] && [ -f "$TLS_KEY_PATH" ]; then
+		DISPLAY_SCHEME="https"
+	fi
+
+	local work panel_src olcrtc_src
+	work="$(mktemp -d /tmp/olcrtc-manager-install.XXXXXX)"
+	trap 'rm -rf "${work:-}"' EXIT
+	panel_src="$work/panel"
+	olcrtc_src="$work/olcrtc"
+
+	log "pulling latest sources"
+	clone_repo "$OLCRTC_REPO" "$OLCRTC_REF" "$olcrtc_src"
+	clone_repo "$PANEL_REPO" "$PANEL_REF" "$panel_src"
+
+	build_olcrtc "$olcrtc_src"
+	build_manager "$panel_src"
+	sync_sources "$panel_src"
+
+	log "restarting service"
+	systemctl restart olcrtc-manager
+	sleep 1
+	if systemctl is-active --quiet olcrtc-manager; then
+		log "service is running"
+	else
+		die "service failed to start; check: journalctl -u olcrtc-manager -n 20"
+	fi
+
+	log "update complete"
+	log "service: systemctl status olcrtc-manager"
+	log "Access URL: ${DISPLAY_SCHEME}://${DISPLAY_HOST}:${PANEL_PORT}${DISPLAY_ADMIN_PATH}"
+}
+
 main() {
 	need_root
+
+	if detect_existing_install; then
+		log "=========================================="
+		log " OlcRTC Manager Panel is already installed"
+		log "=========================================="
+		show_existing_info
+		echo ""
+
+		if [ "${UPDATE_MODE:-}" = "1" ]; then
+			log "UPDATE_MODE=1 set, proceeding with update"
+			do_update
+			return
+		fi
+
+		if [ ! -t 0 ]; then
+			log "non-interactive mode; run with UPDATE_MODE=1 to update"
+			log "or pipe 'yes' to accept: echo y | bash install.sh"
+			return 0
+		fi
+
+		printf '[olcrtc-manager] Update to latest version? [y/N] '
+		read -r answer </dev/tty
+		case "$answer" in
+			[yY]|[yY][eE][sS])
+				do_update
+				;;
+			*)
+				log "skipping update; nothing changed"
+				;;
+		esac
+		return
+	fi
+
 	install_packages
 	install_go
 	ensure_build_memory
