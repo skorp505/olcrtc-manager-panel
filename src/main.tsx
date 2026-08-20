@@ -176,7 +176,7 @@ function combineJitsiRoomId(instance: string, room: string): string {
 const carriers = ["jitsi", "wbstream", "telemost"];
 const transportsByCarrier: Record<string, string[]> = {
   jitsi: ["datachannel", "vp8channel", "seichannel", "videochannel"],
-  wbstream: ["vp8channel", "seichannel", "videochannel"],
+  wbstream: ["datachannel", "vp8channel", "seichannel", "videochannel"],
   telemost: ["vp8channel", "videochannel"],
 };
 
@@ -209,19 +209,19 @@ const defaultSettingsForm: SettingsForm = {
 const payloadFields: Record<string, Array<{ key: string; label: string; defaultValue: string }>> = {
   datachannel: [],
   vp8channel: [
-    { key: "vp8-fps", label: "FPS", defaultValue: "60" },
+    { key: "vp8-fps", label: "FPS", defaultValue: "30" },
     { key: "vp8-batch", label: "Batch", defaultValue: "64" },
   ],
   seichannel: [
-    { key: "fps", label: "FPS", defaultValue: "60" },
+    { key: "fps", label: "FPS", defaultValue: "30" },
     { key: "batch", label: "Batch", defaultValue: "64" },
     { key: "frag", label: "Fragment bytes", defaultValue: "900" },
     { key: "ack-ms", label: "ACK timeout ms", defaultValue: "2000" },
   ],
   videochannel: [
-    { key: "video-w", label: "Width", defaultValue: "1080" },
+    { key: "video-w", label: "Width", defaultValue: "1920" },
     { key: "video-h", label: "Height", defaultValue: "1080" },
-    { key: "video-fps", label: "FPS", defaultValue: "60" },
+    { key: "video-fps", label: "FPS", defaultValue: "30" },
     { key: "video-codec", label: "Codec", defaultValue: "qrcode" },
     { key: "video-qr-size", label: "QR size", defaultValue: "0" },
     { key: "video-qr-recovery", label: "QR recovery", defaultValue: "low" },

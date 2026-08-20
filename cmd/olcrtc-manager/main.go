@@ -118,6 +118,7 @@ type Location struct {
 type Endpoint struct {
 	RoomID string `json:"room_id"`
 	Key    string `json:"key"`
+	Token  string `json:"token,omitempty"`
 }
 
 type Socks5Proxy struct {
@@ -133,22 +134,26 @@ type Transport struct {
 }
 
 type olcrtcRuntimeConfig struct {
-	Mode   string             `yaml:"mode"`
-	Auth   olcrtcAuthConfig   `yaml:"auth"`
-	Room   olcrtcRoomConfig   `yaml:"room,omitempty"`
-	Crypto olcrtcCryptoConfig `yaml:"crypto,omitempty"`
-	Net    olcrtcNetConfig    `yaml:"net"`
-	SOCKS  olcrtcSocksConfig  `yaml:"socks,omitempty"`
-	VP8    *olcrtcVP8Config   `yaml:"vp8,omitempty"`
-	SEI    *olcrtcSEIConfig   `yaml:"sei,omitempty"`
-	Video *olcrtcVideoConfig `yaml:"video,omitempty"`
-	Gen   *olcrtcGenConfig   `yaml:"gen,omitempty"`
-	Data  string             `yaml:"data,omitempty"`
-	Debug bool               `yaml:"debug,omitempty"`
+	Mode      string                  `yaml:"mode"`
+	Auth      olcrtcAuthConfig        `yaml:"auth"`
+	Room      olcrtcRoomConfig        `yaml:"room,omitempty"`
+	Crypto    olcrtcCryptoConfig      `yaml:"crypto,omitempty"`
+	Net       olcrtcNetConfig         `yaml:"net"`
+	SOCKS     olcrtcSocksConfig       `yaml:"socks,omitempty"`
+	VP8       *olcrtcVP8Config        `yaml:"vp8,omitempty"`
+	SEI       *olcrtcSEIConfig        `yaml:"sei,omitempty"`
+	Video     *olcrtcVideoConfig      `yaml:"video,omitempty"`
+	Gen       *olcrtcGenConfig        `yaml:"gen,omitempty"`
+	Data      string                  `yaml:"data,omitempty"`
+	Debug     bool                    `yaml:"debug,omitempty"`
+	Liveness  *olcrtcLivenessConfig   `yaml:"liveness,omitempty"`
+	Lifecycle *olcrtcLifecycleConfig  `yaml:"lifecycle,omitempty"`
+	Traffic   *olcrtcTrafficConfig    `yaml:"traffic,omitempty"`
 }
 
 type olcrtcAuthConfig struct {
 	Provider string `yaml:"provider"`
+	Token    string `yaml:"token,omitempty"`
 }
 
 type olcrtcRoomConfig struct {
@@ -196,6 +201,22 @@ type olcrtcVideoConfig struct {
 
 type olcrtcGenConfig struct {
 	Amount int `yaml:"amount"`
+}
+
+type olcrtcLivenessConfig struct {
+	Interval string `yaml:"interval,omitempty"`
+	Timeout  string `yaml:"timeout,omitempty"`
+	Failures int    `yaml:"failures,omitempty"`
+}
+
+type olcrtcLifecycleConfig struct {
+	MaxSessionDuration string `yaml:"max_session_duration,omitempty"`
+}
+
+type olcrtcTrafficConfig struct {
+	MaxPayloadSize int    `yaml:"max_payload_size,omitempty"`
+	MinDelay       string `yaml:"min_delay,omitempty"`
+	MaxDelay       string `yaml:"max_delay,omitempty"`
 }
 
 func (t *Transport) UnmarshalJSON(data []byte) error {
@@ -1734,7 +1755,7 @@ func randomUUID() (string, error) {
 func serverConfig(loc Location) (olcrtcRuntimeConfig, error) {
 	cfg := olcrtcRuntimeConfig{
 		Mode:   "srv",
-		Auth:   olcrtcAuthConfig{Provider: loc.Carrier},
+		Auth:   olcrtcAuthConfig{Provider: loc.Carrier, Token: loc.Endpoint.Token},
 		Room:   olcrtcRoomConfig{ID: loc.Endpoint.RoomID},
 		Crypto: olcrtcCryptoConfig{Key: loc.Endpoint.Key},
 		Net: olcrtcNetConfig{
@@ -3167,7 +3188,7 @@ func isSupported(carrier, transport string) bool {
 			"videochannel": true,
 		},
 		"wbstream": {
-			"datachannel":  false,
+			"datachannel":  true,
 			"vp8channel":   true,
 			"seichannel":   true,
 			"videochannel": true,
