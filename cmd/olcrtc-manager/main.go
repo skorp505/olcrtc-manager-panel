@@ -1465,7 +1465,6 @@ func buildLocations(clientID string, requests []locationRequest) ([]Location, er
 			Carrier:   carrier,
 			Transport: transportConfig,
 			Link:      "direct",
-			Data:      "data",
 			DNS:       dns,
 			Proxy:     req.Proxy,
 		}
@@ -3164,9 +3163,6 @@ func (c Config) Validate() error {
 		}
 		if loc.Link == "" {
 			return fmt.Errorf("%s.link is required", prefix)
-		}
-		if loc.Data == "" {
-			return fmt.Errorf("%s.data is required", prefix)
 		}
 		if loc.DNS == "" {
 			return fmt.Errorf("%s.dns is required", prefix)
