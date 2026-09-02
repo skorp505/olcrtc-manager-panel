@@ -198,7 +198,6 @@ https://example.com:9443/admin
             "type": "datachannel"
           },
           "link": "direct",
-          "data": "data",
           "dns": "1.1.1.1:53",
           "proxy": {
             "addr": "127.0.0.1",

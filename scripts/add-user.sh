@@ -216,7 +216,6 @@ else:
             "type": transport,
         },
         "link": "direct",
-        "data": "data",
         "dns": dns,
     }
     if proxy_addr or proxy_port or proxy_user or proxy_pass:
