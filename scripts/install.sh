@@ -490,41 +490,8 @@ do_update() {
 	log "Access URL: ${DISPLAY_SCHEME}://${DISPLAY_HOST}:${PANEL_PORT}${DISPLAY_ADMIN_PATH}"
 }
 
-main() {
+do_install() {
 	need_root
-
-	if detect_existing_install; then
-		log "=========================================="
-		log " OlcRTC Manager Panel is already installed"
-		log "=========================================="
-		show_existing_info
-		echo ""
-
-		if [ "${UPDATE_MODE:-}" = "1" ]; then
-			log "UPDATE_MODE=1 set, proceeding with update"
-			do_update
-			return
-		fi
-
-		if [ ! -t 0 ]; then
-			log "non-interactive mode; run with UPDATE_MODE=1 to update"
-			log "or pipe 'yes' to accept: echo y | bash install.sh"
-			return 0
-		fi
-
-		printf '[olcrtc-manager] Update to latest version? [y/N] '
-		read -r answer </dev/tty
-		case "$answer" in
-			[yY]|[yY][eE][sS])
-				do_update
-				;;
-			*)
-				log "skipping update; nothing changed"
-				;;
-		esac
-		return
-	fi
-
 	install_packages
 	install_go
 	ensure_build_memory
@@ -561,6 +528,62 @@ main() {
 	if [ "$PANEL_TLS" = "1" ]; then
 		log "TLS uses a self-signed certificate by default; browsers may ask you to accept it."
 	fi
+}
+
+main() {
+	need_root
+
+	if detect_existing_install; then
+		log "=========================================="
+		log " OlcRTC Manager Panel is already installed"
+		log "=========================================="
+		show_existing_info
+		echo ""
+
+		# Неинтерактивный режим: возможно только обновление через UPDATE_MODE=1,
+		# либо прерывание (прежнее поведение).
+		if [ ! -t 0 ]; then
+			if [ "${UPDATE_MODE:-}" = "1" ]; then
+				log "UPDATE_MODE=1 set, proceeding with update"
+				do_update
+			else
+				log "non-interactive mode; run with UPDATE_MODE=1 to update"
+				log "or pipe 'yes' to accept: echo y | bash install.sh"
+			fi
+			return 0
+		fi
+
+		# Интерактивный режим: предлагаем выбор действия.
+		while :; do
+			printf '[olcrtc-manager] Existing installation detected. Choose an action:\n'
+			printf '[olcrtc-manager]   [1] Update to the latest version\n'
+			printf '[olcrtc-manager]   [2] Reinstall (rebuild, keep existing config)\n'
+			printf '[olcrtc-manager]   [3] Abort / do nothing\n'
+			printf '[olcrtc-manager] Your choice [1/2/3]: '
+			read -r choice </dev/tty
+			case "$choice" in
+				1)
+					do_update
+					break
+					;;
+				2)
+					log "reinstalling (keeping existing config/env)"
+					do_install
+					break
+					;;
+				3)
+					log "aborted; nothing changed"
+					break
+					;;
+				*)
+					log "invalid choice; please enter 1, 2 or 3"
+					;;
+			esac
+		done
+		return
+	fi
+
+	do_install
 }
 
 main "$@"
