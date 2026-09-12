@@ -3640,6 +3640,41 @@ func latestPanelVersion() (string, error) {
 	return v, nil
 }
 
+func latestPanelChangelog() string {
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Get(panelRepoRawBase + "/CHANGELOG.md")
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return ""
+	}
+	return extractChangelogBlock(string(data))
+}
+
+func extractChangelogBlock(markdown string) string {
+	var block []string
+	inBlock := false
+	for _, line := range strings.Split(markdown, "\n") {
+		if strings.HasPrefix(line, "## ") {
+			if inBlock {
+				break
+			}
+			inBlock = true
+			continue
+		}
+		if inBlock {
+			block = append(block, strings.TrimRight(line, " \t"))
+		}
+	}
+	return strings.TrimSpace(strings.Join(block, "\n"))
+}
+
 func versionCompare(a, b string) (majorA, minorA, patchA, majorB, minorB, patchB int, ok bool) {
 	fieldsA := strings.Split(strings.TrimSpace(a), ".")
 	fieldsB := strings.Split(strings.TrimSpace(b), ".")
@@ -3697,6 +3732,7 @@ func updateCheckHandler(configPath string) http.HandlerFunc {
 			"current":          current,
 			"latest":           latest,
 			"update_available": isNewerVersion(latest, current),
+			"changelog":        latestPanelChangelog(),
 		})
 	}
 }

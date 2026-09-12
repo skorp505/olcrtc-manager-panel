@@ -1178,12 +1178,13 @@ function App() {
   const [settingsForm, setSettingsForm] = useState<SettingsForm>(defaultSettingsForm);
   const [passwordForm, setPasswordForm] = useState({ current: "", next: "", repeat: "" });
   const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
-  const [updateState, setUpdateState] = useState<{ current: string; latest: string; update_available: boolean; checking: boolean; error: string }>({
+  const [updateState, setUpdateState] = useState<{ current: string; latest: string; update_available: boolean; checking: boolean; error: string; changelog: string }>({
     current: "",
     latest: "",
     update_available: false,
     checking: false,
     error: "",
+    changelog: "",
   });
 
   const checkAuth = async () => {
@@ -1253,6 +1254,7 @@ function App() {
         latest: string;
         update_available: boolean;
         error?: string;
+        changelog?: string;
       };
       setUpdateState({
         current: body.current,
@@ -1260,6 +1262,7 @@ function App() {
         update_available: Boolean(body.update_available),
         checking: false,
         error: body.error ?? "",
+        changelog: body.changelog ?? "",
       });
     } catch (err) {
       setUpdateState((prev) => ({ ...prev, checking: false, error: (err as Error).message }));
@@ -2090,7 +2093,23 @@ function App() {
                 {" · "}Доступная версия: <span className="text-foreground">{updateState.update_available ? updateState.latest : "—"}</span>
               </div>
               {updateState.error && <div className="text-xs text-red-500">{updateState.error}</div>}
-              <div className="mt-auto flex flex-col gap-2 pt-3">
+              {updateState.changelog && (
+                <>
+                  <div className="mt-5 border-t border-border pt-4">
+                    <div className="mb-3 text-xs font-medium text-muted-foreground">Изменения в версии {updateState.latest || "…"}</div>
+                    <ul className="ml-4 list-disc space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+                      {updateState.changelog
+                        .split("\n")
+                        .map((line) => line.replace(/^\s*[-*]\s*/, "").trim())
+                        .filter((line) => line !== "")
+                        .map((line, index) => (
+                          <li key={index}>{line}</li>
+                        ))}
+                    </ul>
+                  </div>
+                </>
+              )}
+              <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4">
                 <button
                   className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border bg-muted px-3 text-sm hover:bg-muted/80 disabled:opacity-60"
                   disabled={updateState.checking || busy}
