@@ -140,6 +140,7 @@ type olcrtcRuntimeConfig struct {
 	Crypto    olcrtcCryptoConfig      `yaml:"crypto,omitempty"`
 	Net       olcrtcNetConfig         `yaml:"net"`
 	SOCKS     olcrtcSocksConfig       `yaml:"socks,omitempty"`
+	Engine    *olcrtcEngineConfig     `yaml:"engine,omitempty"`
 	VP8       *olcrtcVP8Config        `yaml:"vp8,omitempty"`
 	SEI       *olcrtcSEIConfig        `yaml:"sei,omitempty"`
 	Video     *olcrtcVideoConfig      `yaml:"video,omitempty"`
@@ -174,6 +175,12 @@ type olcrtcSocksConfig struct {
 	ProxyPort int    `yaml:"proxy_port,omitempty"`
 	ProxyUser string `yaml:"proxy_user,omitempty"`
 	ProxyPass string `yaml:"proxy_pass,omitempty"`
+}
+
+type olcrtcEngineConfig struct {
+	Name  string `yaml:"name,omitempty"`
+	URL   string `yaml:"url,omitempty"`
+	Token string `yaml:"token,omitempty"`
 }
 
 type olcrtcVP8Config struct {
@@ -1779,6 +1786,13 @@ func serverConfig(loc Location) (olcrtcRuntimeConfig, error) {
 
 func applyTransportPayload(cfg *olcrtcRuntimeConfig, transport Transport) error {
 	payload := cleanPayload(transport.Payload)
+	engine := olcrtcEngineConfig{}
+	engine.Name = payload["engine-name"]
+	engine.URL = payload["engine-url"]
+	engine.Token = payload["engine-token"]
+	if engine != (olcrtcEngineConfig{}) {
+		cfg.Engine = &engine
+	}
 	switch transport.Type {
 	case "datachannel":
 		return nil
