@@ -13,6 +13,7 @@ import (
 	"flag"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"io/fs"
 	"log"
 	"net"
@@ -43,6 +44,15 @@ var adminSessions = newSessionStore()
 var adminConfigPath string
 
 const defaultGeneratedJitsiBase = "https://meet.handyweb.org"
+
+const (
+	panelRepoRawBase = "https://raw.githubusercontent.com/skorp505/olcrtc-manager-panel/main"
+	panelVersionFile = "panel-version"
+	panelInstallURL  = "https://raw.githubusercontent.com/skorp505/olcrtc-manager-panel/main/scripts/install.sh"
+)
+
+//go:embed panel-version
+var embeddedPanelVersion string
 
 type Config struct {
 	Version          int        `json:"version"`
@@ -397,6 +407,8 @@ func run() error {
 	handler.Handle("/api/auth/me", http.HandlerFunc(authMeHandler(configPath)))
 	handler.Handle("/api/auth/password", adminAuth(http.HandlerFunc(changePasswordHandler(configPath))))
 	handler.Handle("/api/settings", adminAuth(http.HandlerFunc(settingsHandler(configPath, supervisor, port != 0))))
+	handler.Handle("/api/update/check", adminAuth(updateCheckHandler(configPath)))
+	handler.Handle("/api/update/run", adminAuth(updateRunHandler(configPath)))
 	handler.Handle("/api/reload", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.Header().Set("Allow", http.MethodPost)
@@ -3582,6 +3594,149 @@ func panelEnvPath(configPath string) string {
 		return filepath.Join(filepath.Dir(configPath), "panel.env")
 	}
 	return "/etc/olcrtc-manager/panel.env"
+}
+
+func panelVersionPath(configPath string) string {
+	if path := os.Getenv("OLCRTC_MANAGER_VERSION_FILE"); path != "" {
+		return path
+	}
+	if configPath != "" {
+		return filepath.Join(filepath.Dir(configPath), panelVersionFile)
+	}
+	return "/etc/olcrtc-manager/panel-version"
+}
+
+func currentPanelVersion(configPath string) string {
+	if data, err := os.ReadFile(panelVersionPath(configPath)); err == nil {
+		if v := strings.TrimSpace(string(data)); v != "" {
+			return v
+		}
+	}
+	v := strings.TrimSpace(embeddedPanelVersion)
+	if v == "" {
+		return "unknown"
+	}
+	return v
+}
+
+func latestPanelVersion() (string, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Get(panelRepoRawBase + "/" + panelVersionFile)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("checking version: http %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if err != nil {
+		return "", err
+	}
+	v := strings.TrimSpace(string(data))
+	if v == "" {
+		return "", errors.New("empty version from upstream")
+	}
+	return v, nil
+}
+
+func versionCompare(a, b string) (majorA, minorA, patchA, majorB, minorB, patchB int, ok bool) {
+	fieldsA := strings.Split(strings.TrimSpace(a), ".")
+	fieldsB := strings.Split(strings.TrimSpace(b), ".")
+	if len(fieldsA) < 2 || len(fieldsB) < 2 {
+		return 0, 0, 0, 0, 0, 0, false
+	}
+	parse := func(f string) int {
+		n, _ := strconv.Atoi(strings.TrimSpace(f))
+		return n
+	}
+	majorA, minorA, patchA = parse(fieldsA[0]), parse(fieldsA[1]), 0
+	majorB, minorB, patchB = parse(fieldsB[0]), parse(fieldsB[1]), 0
+	if len(fieldsA) > 2 {
+		patchA = parse(fieldsA[2])
+	}
+	if len(fieldsB) > 2 {
+		patchB = parse(fieldsB[2])
+	}
+	return majorA, minorA, patchA, majorB, minorB, patchB, true
+}
+
+func isNewerVersion(latest, current string) bool {
+	majorA, minorA, patchA, majorB, minorB, patchB, ok := versionCompare(latest, current)
+	if !ok {
+		return false
+	}
+	if majorA != majorB {
+		return majorA > majorB
+	}
+	if minorA != minorB {
+		return minorA > minorB
+	}
+	return patchA > patchB
+}
+
+func updateCheckHandler(configPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", http.MethodGet)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		current := currentPanelVersion(configPath)
+		latest, err := latestPanelVersion()
+		if err != nil {
+			writeJSON(w, map[string]any{
+				"current":          current,
+				"latest":           "",
+				"update_available": false,
+				"error":            err.Error(),
+			})
+			return
+		}
+		writeJSON(w, map[string]any{
+			"current":          current,
+			"latest":           latest,
+			"update_available": isNewerVersion(latest, current),
+		})
+	}
+}
+
+func updateRunHandler(configPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		current := currentPanelVersion(configPath)
+		hasUpdate := false
+		if latest, err := latestPanelVersion(); err == nil {
+			hasUpdate = isNewerVersion(latest, current)
+		}
+		if !hasUpdate {
+			writeJSONStatus(w, http.StatusConflict, map[string]any{"error": "already up to date"})
+			return
+		}
+		logFile := filepath.Join(filepath.Dir(configPath), "update.log")
+		f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			http.Error(w, "cannot open update log: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		fmt.Fprintf(f, "\n== update started %s ==\n", time.Now().Format(time.RFC3339))
+		go func() {
+			defer f.Close()
+			cmd := exec.Command("/bin/bash", "-c", "set -o pipefail; curl -fsSL '"+panelInstallURL+"' | UPDATE_MODE=1 bash")
+			cmd.Stdout = f
+			cmd.Stderr = f
+			if err := cmd.Run(); err != nil {
+				fmt.Fprintf(f, "update failed: %v\n", err)
+				return
+			}
+			fmt.Fprintf(f, "update finished %s\n", time.Now().Format(time.RFC3339))
+		}()
+		writeJSON(w, map[string]any{"started": true, "log": logFile})
+	}
 }
 
 func readEnvFile(path string) (map[string]string, error) {

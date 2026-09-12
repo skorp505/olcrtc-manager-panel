@@ -193,6 +193,17 @@ build_manager() {
 	install -m 0755 /tmp/olcrtc-manager /usr/local/bin/olcrtc-manager
 }
 
+write_panel_version() {
+	local src="$1"
+	install -d -m 0755 "$CONFIG_DIR"
+	if [ -f "$src/panel-version" ]; then
+		install -m 0644 "$src/panel-version" "$CONFIG_DIR/panel-version"
+	else
+		printf '%s\n' "unknown" > "$CONFIG_DIR/panel-version"
+	fi
+	log "panel version: $(cat "$CONFIG_DIR/panel-version")"
+}
+
 detect_manager_features() {
 	if grep -aq "OLCRTC_MANAGER_ADMIN_PATH" /usr/local/bin/olcrtc-manager; then
 		PANEL_SUPPORTS_ADMIN_PATH=1
@@ -474,6 +485,7 @@ do_update() {
 
 	build_olcrtc "$olcrtc_src"
 	build_manager "$panel_src"
+	write_panel_version "$panel_src"
 	sync_sources "$panel_src"
 
 	log "restarting service"
@@ -506,6 +518,7 @@ do_install() {
 	clone_repo "$PANEL_REPO" "$PANEL_REF" "$panel_src"
 	build_olcrtc "$olcrtc_src"
 	build_manager "$panel_src"
+	write_panel_version "$panel_src"
 	detect_manager_features
 	write_config_if_missing
 	apply_config_port
