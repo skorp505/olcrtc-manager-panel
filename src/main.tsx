@@ -2036,7 +2036,7 @@ function App() {
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">
-            <section className="grid gap-3 rounded-md border border-border bg-background p-4">
+            <section className="flex flex-col gap-3 rounded-md border border-border bg-background p-4">
               <div className="text-sm font-medium text-foreground">Пароль администратора</div>
               {settings?.admin_user && <div className="text-xs text-muted-foreground">Пользователь: {settings.admin_user}</div>}
               <label className="grid gap-2 text-sm text-muted-foreground">
@@ -2049,21 +2049,21 @@ function App() {
                   autoComplete="current-password"
                 />
               </label>
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="grid gap-2 text-sm text-muted-foreground">
-                  Новый пароль
+              <div className="grid min-w-0 grid-cols-2 gap-2">
+                <label className="grid min-w-0 gap-2 text-sm text-muted-foreground">
+                  <span className="truncate">Новый пароль</span>
                   <input
-                    className="h-10 rounded-md border border-border bg-card px-3 text-foreground outline-none focus:border-primary"
+                    className="h-10 min-w-0 rounded-md border border-border bg-card px-3 text-foreground outline-none focus:border-primary"
                     type="password"
                     value={passwordForm.next}
                     onChange={(event) => setPasswordForm({ ...passwordForm, next: event.target.value })}
                     autoComplete="new-password"
                   />
                 </label>
-                <label className="grid gap-2 text-sm text-muted-foreground">
-                  Повтор нового пароля
+                <label className="grid min-w-0 gap-2 text-sm text-muted-foreground">
+                  <span className="truncate">Повтор нового пароля</span>
                   <input
-                    className="h-10 rounded-md border border-border bg-card px-3 text-foreground outline-none focus:border-primary"
+                    className="h-10 min-w-0 rounded-md border border-border bg-card px-3 text-foreground outline-none focus:border-primary"
                     type="password"
                     value={passwordForm.repeat}
                     onChange={(event) => setPasswordForm({ ...passwordForm, repeat: event.target.value })}
@@ -2071,7 +2071,7 @@ function App() {
                   />
                 </label>
               </div>
-              <div className="flex justify-end">
+              <div className="mt-auto flex justify-end pt-3">
                 <button
                   className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-muted px-3 text-sm hover:bg-muted/80 disabled:opacity-60"
                   disabled={busy}
@@ -2083,22 +2083,14 @@ function App() {
               </div>
             </section>
 
-            <section className="grid gap-3 rounded-md border border-border bg-background p-4">
+            <section className="flex flex-col gap-3 rounded-md border border-border bg-background p-4">
               <div className="text-sm font-medium text-foreground">Обновление</div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <div className="text-xs text-muted-foreground">Установленная версия</div>
-                  <div className="mt-0.5 text-foreground">{updateState.current || "…"}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Доступная версия</div>
-                  <div className="mt-0.5 text-foreground">
-                    {updateState.update_available ? updateState.latest : "—"}
-                  </div>
-                </div>
+              <div className="text-xs text-muted-foreground">
+                Установленная версия: <span className="text-foreground">{updateState.current || "…"}</span>
+                {" · "}Доступная версия: <span className="text-foreground">{updateState.update_available ? updateState.latest : "—"}</span>
               </div>
               {updateState.error && <div className="text-xs text-red-500">{updateState.error}</div>}
-              <div className="flex flex-col gap-2">
+              <div className="mt-auto flex flex-col gap-2 pt-3">
                 <button
                   className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border bg-muted px-3 text-sm hover:bg-muted/80 disabled:opacity-60"
                   disabled={updateState.checking || busy}
