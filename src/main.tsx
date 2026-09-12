@@ -2097,15 +2097,17 @@ function App() {
                 <>
                   <div className="mt-5 border-t border-border pt-4">
                     <div className="mb-3 text-xs font-medium text-muted-foreground">Изменения в версии {updateState.latest || "…"}</div>
-                    <ul className="ml-4 list-disc space-y-1.5 text-xs leading-relaxed text-muted-foreground">
-                      {updateState.changelog
-                        .split("\n")
-                        .map((line) => line.replace(/^\s*[-*]\s*/, "").trim())
-                        .filter((line) => line !== "")
-                        .map((line, index) => (
-                          <li key={index}>{line}</li>
-                        ))}
-                    </ul>
+                    <div className="max-h-44 overflow-y-auto pr-1">
+                      <ul className="ml-4 list-disc space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+                        {updateState.changelog
+                          .split("\n")
+                          .map((line) => line.replace(/^\s*[-*]\s*/, "").trim())
+                          .filter((line) => line !== "")
+                          .map((line, index) => (
+                            <li key={index}>{line}</li>
+                          ))}
+                      </ul>
+                    </div>
                   </div>
                 </>
               )}
