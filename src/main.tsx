@@ -11,6 +11,7 @@ import {
   Lock,
   Plus,
   RefreshCw,
+  RotateCw,
   Server,
   Settings,
   Terminal,
@@ -1207,6 +1208,8 @@ function App() {
   const [updateRunning, setUpdateRunning] = useState(false);
   const [updateLog, setUpdateLog] = useState("");
   const [showUpdateLog, setShowUpdateLog] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [updateSucceeded, setUpdateSucceeded] = useState(false);
   const updateLogRef = useRef<HTMLPreElement>(null);
   const pollUpdateRef = useRef(false);
 
@@ -1311,6 +1314,7 @@ function App() {
       const body = await res.json();
       setUpdateLog(body.log ?? "");
       setUpdateRunning(Boolean(body.running));
+      setUpdateProgress(Math.min(100, Math.max(0, Number(body.progress) || 0)));
       if (body.running) {
         window.setTimeout(() => pollUpdateLog(0), 1000);
         return;
@@ -1318,7 +1322,8 @@ function App() {
       pollUpdateRef.current = false;
       const log = String(body.log ?? "");
       if (/update complete|service is running|restarting service/.test(log)) {
-        setNotice("Обновление установлено успешно.");
+        setUpdateSucceeded(true);
+        setNotice("Обновление установлено успешно. Перезапустите страницу.");
         await checkUpdate();
       } else if (/update failed/.test(log)) {
         const line =
@@ -1347,6 +1352,8 @@ function App() {
       await request("/api/update/run", { method: "POST" });
       setNotice("Обновление запущено. Ход выполнения — ниже.");
       setUpdateLog("");
+      setUpdateProgress(0);
+      setUpdateSucceeded(false);
       pollUpdateRef.current = true;
       setUpdateRunning(true);
       window.setTimeout(() => pollUpdateLog(0), 500);
@@ -2210,15 +2217,33 @@ function App() {
                   <Terminal className="h-4 w-4" />
                   {showUpdateLog ? "Скрыть лог" : "Показать лог"}
                 </button>
-                {updateState.update_available && (
+                {updateSucceeded ? (
                   <button
-                    className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-black hover:bg-primary/90 disabled:opacity-60"
-                    disabled={busy || updateRunning}
-                    onClick={runUpdate}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-black hover:bg-primary/90"
+                    onClick={() => window.location.reload()}
                   >
-                    {updateRunning ? <Settings className="h-4 w-4 animate-spin" /> : <Settings className="h-4 w-4" />}
-                    {updateRunning ? `Обновление до ${updateState.latest}…` : `Обновить до ${updateState.latest}`}
+                    <RotateCw className="h-4 w-4" />
+                    Перезапустить страницу
                   </button>
+                ) : (
+                  updateState.update_available && (
+                    <button
+                      className="relative inline-flex h-9 items-center justify-center gap-2 overflow-hidden rounded-md bg-primary px-3 text-sm font-medium text-black hover:bg-primary/90 disabled:opacity-60"
+                      disabled={busy || updateRunning}
+                      onClick={runUpdate}
+                    >
+                      <span className="relative z-10 inline-flex items-center gap-2">
+                        <Settings className={`h-4 w-4 ${updateRunning ? "animate-spin" : ""}`} />
+                        {updateRunning ? `Обновление… ${updateProgress}%` : `Обновить до ${updateState.latest}`}
+                      </span>
+                      {updateRunning && (
+                        <span
+                          className="pointer-events-none absolute inset-y-0 left-0 bg-white/30 transition-all"
+                          style={{ width: `${updateProgress}%` }}
+                        />
+                      )}
+                    </button>
+                  )
                 )}
               </div>
             </section>

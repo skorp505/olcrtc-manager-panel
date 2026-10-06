@@ -23,6 +23,12 @@ PANEL_REPO="${PANEL_REPO:-https://github.com/skorp505/olcrtc-manager-panel.git}"
 PANEL_REF="${PANEL_REF:-main}"
 OLCRTC_REPO="${OLCRTC_REPO:-https://github.com/openlibrecommunity/olcrtc.git}"
 OLCRTC_REF="${OLCRTC_REF:-master}"
+
+progress() {
+	if [ "${UPDATE_MODE:-}" = "1" ]; then
+		printf '[PROGRESS:%s] %s\n' "$1" "$2"
+	fi
+}
 UPDATE_MODE="${UPDATE_MODE:-}"
 GO_VERSION="${GO_VERSION:-1.26.3}"
 MIN_BUILD_MEMORY_MB="${MIN_BUILD_MEMORY_MB:-2048}"
@@ -450,11 +456,13 @@ sys.exit(1)
 }
 
 do_update() {
+	progress 5 "preparing environment"
 	need_root
 	install_packages
 	install_go
 	ensure_build_memory
 
+	progress 20 "checking existing installation"
 	show_existing_info
 	migrate_config
 	apply_config_port
@@ -479,15 +487,20 @@ do_update() {
 	panel_src="$work/panel"
 	olcrtc_src="$work/olcrtc"
 
-	log "pulling latest sources"
+	progress 30 "pulling latest sources"
 	clone_repo "$OLCRTC_REPO" "$OLCRTC_REF" "$olcrtc_src"
+	progress 40 "cloning panel sources"
 	clone_repo "$PANEL_REPO" "$PANEL_REF" "$panel_src"
 
+	progress 55 "building olcrtc binary"
 	build_olcrtc "$olcrtc_src"
+	progress 80 "building panel binary"
 	build_manager "$panel_src"
+	progress 92 "writing panel version"
 	write_panel_version "$panel_src"
 	sync_sources "$panel_src"
 
+	progress 96 "restarting service"
 	log "restarting service"
 	systemctl restart olcrtc-manager
 	sleep 1
@@ -497,6 +510,7 @@ do_update() {
 		die "service failed to start; check: journalctl -u olcrtc-manager -n 20"
 	fi
 
+	progress 100 "update complete"
 	log "update complete"
 	log "service: systemctl status olcrtc-manager"
 	log "Access URL: ${DISPLAY_SCHEME}://${DISPLAY_HOST}:${PANEL_PORT}${DISPLAY_ADMIN_PATH}"

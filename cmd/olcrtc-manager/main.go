@@ -23,6 +23,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -3819,11 +3820,29 @@ func updateLogHandler(configPath string) http.HandlerFunc {
 			log = readTail(string(data), 64<<10)
 		}
 		writeJSON(w, map[string]any{
-			"running": running,
-			"current": currentPanelVersion(configPath),
-			"log":     log,
+			"running":  running,
+			"current":  currentPanelVersion(configPath),
+			"log":      log,
+			"progress": lastProgress(log),
 		})
 	}
+}
+
+var progressRe = regexp.MustCompile(`\[PROGRESS:(\d+)\]`)
+
+func lastProgress(s string) int {
+	all := progressRe.FindAllStringSubmatch(s, -1)
+	if len(all) == 0 {
+		return 0
+	}
+	n, err := strconv.Atoi(all[len(all)-1][1])
+	if err != nil || n < 0 {
+		return 0
+	}
+	if n > 100 {
+		return 100
+	}
+	return n
 }
 
 func readTail(s string, max int) string {
