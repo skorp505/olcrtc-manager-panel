@@ -2,6 +2,15 @@
 
 История изменений панели управления OlcRTC Manager.
 
+## 1.0.1
+
+### Что нового
+- **Обновлены зависимости**: Vite 5 → 8, React 18 → 19, TypeScript 5 → 7, Tailwind CSS 3 → 4, lucide-react, @vitejs/plugin-react.
+- **Tailwind 4**: миграция на `@import "tailwindcss"` + `@config`, цветовая тема сохранена.
+- **TypeScript**: добавлены `@types/react`/`@types/react-dom` и `vite-env.d.ts`, `moduleResolution: Bundler`; код теперь проходит `tsc --noEmit`.
+- **Исправлен баг**: при обновлении одной локации у клиента с jitsi-локацией остальные могли потерять `jitsi_instance`.
+- **Сборка**: web/dist пересобран (бандл меньше за счёт Vite 8).
+
 ## 1.0.0
 
 ### Что нового

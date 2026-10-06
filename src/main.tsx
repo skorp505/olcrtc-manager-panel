@@ -264,6 +264,24 @@ function normalizeLocationForm(location: ClientLocationForm): ClientLocationForm
   };
 }
 
+function locationToForm(location: LocationState): ClientLocationForm {
+  const { instance, room } =
+    location.carrier === "jitsi"
+      ? splitJitsiRoomId(location.room_id)
+      : { instance: DEFAULT_JITSI_INSTANCE, room: location.room_id };
+  return {
+    name: location.name,
+    room_id: room,
+    jitsi_instance: instance,
+    key: location.key,
+    carrier: location.carrier,
+    transport: location.transport,
+    payload: location.payload ?? {},
+    dns: location.dns,
+    proxy: proxyFromState(location.proxy),
+  };
+}
+
 function normalizeForm(form: ClientForm): ClientForm {
   return {
     ...form,
@@ -1432,18 +1450,7 @@ function App() {
     runAction(async () => {
       if (!editLocation) return;
       const nextLocations = editLocation.client.locations.map((location, index) =>
-        index === editLocation.index
-          ? locationForm
-          : {
-              name: location.name,
-              room_id: location.room_id,
-              key: location.key,
-              carrier: location.carrier,
-              transport: location.transport,
-              payload: location.payload ?? {},
-              dns: location.dns,
-              proxy: proxyFromState(location.proxy),
-            },
+        index === editLocation.index ? locationForm : locationToForm(location),
       );
       await request(`/api/clients/${encodeURIComponent(editLocation.client.client_id)}`, {
         method: "PUT",
