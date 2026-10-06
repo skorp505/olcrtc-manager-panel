@@ -1206,6 +1206,7 @@ function App() {
   });
   const [updateRunning, setUpdateRunning] = useState(false);
   const [updateLog, setUpdateLog] = useState("");
+  const [showUpdateLog, setShowUpdateLog] = useState(false);
   const updateLogRef = useRef<HTMLPreElement>(null);
   const pollUpdateRef = useRef(false);
 
@@ -2161,7 +2162,7 @@ function App() {
                 {" · "}Доступная версия: <span className="text-foreground">{updateState.update_available ? updateState.latest : "—"}</span>
               </div>
               {updateState.error && <div className="text-xs text-red-500">{updateState.error}</div>}
-              {(updateRunning || updateLog) && (
+              {(updateRunning || updateLog) && showUpdateLog && (
                 <div>
                   <div className="text-xs text-muted-foreground">
                     {updateRunning ? <span className="text-primary">Обновление выполняется…</span> : "Лог последнего обновления:"}
@@ -2200,6 +2201,14 @@ function App() {
                 >
                   <RefreshCw className={`h-4 w-4 ${updateState.checking ? "animate-spin" : ""}`} />
                   {updateState.checking ? "Проверка..." : "Проверить обновление"}
+                </button>
+                <button
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border bg-muted px-3 text-sm hover:bg-muted/80 disabled:opacity-60"
+                  disabled={busy}
+                  onClick={() => setShowUpdateLog((visible) => !visible)}
+                >
+                  <Terminal className="h-4 w-4" />
+                  {showUpdateLog ? "Скрыть лог" : "Показать лог"}
                 </button>
                 {updateState.update_available && (
                   <button
