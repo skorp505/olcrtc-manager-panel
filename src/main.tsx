@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
@@ -1204,6 +1204,10 @@ function App() {
     error: "",
     changelog: "",
   });
+  const [updateRunning, setUpdateRunning] = useState(false);
+  const [updateLog, setUpdateLog] = useState("");
+  const updateLogRef = useRef<HTMLPreElement>(null);
+  const pollUpdateRef = useRef(false);
 
   const checkAuth = async () => {
     try {
@@ -1282,8 +1286,56 @@ function App() {
         error: body.error ?? "",
         changelog: body.changelog ?? "",
       });
+      await loadUpdateLog();
     } catch (err) {
       setUpdateState((prev) => ({ ...prev, checking: false, error: (err as Error).message }));
+    }
+  };
+
+  const loadUpdateLog = async () => {
+    try {
+      const res = await request("/api/update/log", { cache: "no-store" });
+      const body = await res.json();
+      setUpdateLog(body.log ?? "");
+      setUpdateRunning(Boolean(body.running));
+    } catch {
+      // эндпоинт появился только в этой версии — старые панели игнорируем
+    }
+  };
+
+  const pollUpdateLog = async (attempt: number) => {
+    if (!pollUpdateRef.current) return;
+    try {
+      const res = await request("/api/update/log", { cache: "no-store" });
+      const body = await res.json();
+      setUpdateLog(body.log ?? "");
+      setUpdateRunning(Boolean(body.running));
+      if (body.running) {
+        window.setTimeout(() => pollUpdateLog(0), 1000);
+        return;
+      }
+      pollUpdateRef.current = false;
+      const log = String(body.log ?? "");
+      if (/update complete|service is running|restarting service/.test(log)) {
+        setNotice("Обновление установлено успешно.");
+        await checkUpdate();
+      } else if (/update failed/.test(log)) {
+        const line =
+          log.split("\n").filter((l) => l.includes("update failed")).pop()?.trim() ?? "неизвестная ошибка";
+        setNotice(`Ошибка обновления: ${line}`);
+      } else if (log.trim()) {
+        setNotice("Обновление завершилось.");
+        await checkUpdate();
+      }
+    } catch {
+      // Панель перезапускается — сервер временно недоступен. Дожидаемся возврата.
+      if (attempt >= 120) {
+        pollUpdateRef.current = false;
+        setUpdateRunning(false);
+        setNotice("Не удалось дочитать лог обновления.");
+        return;
+      }
+      window.setTimeout(() => pollUpdateLog(attempt + 1), 1500);
     }
   };
 
@@ -1292,13 +1344,22 @@ function App() {
     setNotice("");
     try {
       await request("/api/update/run", { method: "POST" });
-      setNotice("Обновление запущено. Панель перезапустится автоматически.");
+      setNotice("Обновление запущено. Ход выполнения — ниже.");
+      setUpdateLog("");
+      pollUpdateRef.current = true;
+      setUpdateRunning(true);
+      window.setTimeout(() => pollUpdateLog(0), 500);
     } catch (err) {
       setNotice((err as Error).message);
     } finally {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    const el = updateLogRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [updateLog]);
 
   useEffect(() => {
     checkAuth();
@@ -2100,6 +2161,19 @@ function App() {
                 {" · "}Доступная версия: <span className="text-foreground">{updateState.update_available ? updateState.latest : "—"}</span>
               </div>
               {updateState.error && <div className="text-xs text-red-500">{updateState.error}</div>}
+              {(updateRunning || updateLog) && (
+                <div>
+                  <div className="text-xs text-muted-foreground">
+                    {updateRunning ? <span className="text-primary">Обновление выполняется…</span> : "Лог последнего обновления:"}
+                  </div>
+                  <pre
+                    ref={updateLogRef}
+                    className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-black p-2 font-mono text-[11px] leading-relaxed text-slate-300"
+                  >
+                    {updateLog || "запуск…"}
+                  </pre>
+                </div>
+              )}
               {updateState.changelog && (
                 <>
                   <div className="mt-5 border-t border-border pt-4">
@@ -2130,11 +2204,11 @@ function App() {
                 {updateState.update_available && (
                   <button
                     className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-black hover:bg-primary/90 disabled:opacity-60"
-                    disabled={busy}
+                    disabled={busy || updateRunning}
                     onClick={runUpdate}
                   >
-                    <Settings className="h-4 w-4" />
-                    Обновить до {updateState.latest}
+                    {updateRunning ? <Settings className="h-4 w-4 animate-spin" /> : <Settings className="h-4 w-4" />}
+                    {updateRunning ? `Обновление до ${updateState.latest}…` : `Обновить до ${updateState.latest}`}
                   </button>
                 )}
               </div>

@@ -409,6 +409,7 @@ func run() error {
 	handler.Handle("/api/settings", adminAuth(http.HandlerFunc(settingsHandler(configPath, supervisor, port != 0))))
 	handler.Handle("/api/update/check", adminAuth(updateCheckHandler(configPath)))
 	handler.Handle("/api/update/run", adminAuth(updateRunHandler(configPath)))
+	handler.Handle("/api/update/log", adminAuth(updateLogHandler(configPath)))
 	handler.Handle("/api/reload", adminAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.Header().Set("Allow", http.MethodPost)
@@ -3746,25 +3747,48 @@ func updateRunHandler(configPath string) http.HandlerFunc {
 		}
 		current := currentPanelVersion(configPath)
 		hasUpdate := false
-		if latest, err := latestPanelVersion(); err == nil {
+		latest := current
+		if v, err := latestPanelVersion(); err == nil {
+			latest = v
 			hasUpdate = isNewerVersion(latest, current)
 		}
 		if !hasUpdate {
 			writeJSONStatus(w, http.StatusConflict, map[string]any{"error": "already up to date"})
 			return
 		}
+		updateMu.Lock()
+		if updateRunning {
+			updateMu.Unlock()
+			writeJSONStatus(w, http.StatusConflict, map[string]any{"error": "update already running"})
+			return
+		}
+		updateRunning = true
+		updateMu.Unlock()
+
 		logFile := filepath.Join(filepath.Dir(configPath), "update.log")
 		f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
+			updateMu.Lock()
+			updateRunning = false
+			updateMu.Unlock()
 			http.Error(w, "cannot open update log: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		fmt.Fprintf(f, "\n== update started %s ==\n", time.Now().Format(time.RFC3339))
+		fmt.Fprintf(f, "\n== update started %s (current=%s -> latest=%s) ==\n",
+			time.Now().Format(time.RFC3339), current, latest)
 		go func() {
 			defer f.Close()
-			cmd := exec.Command("/bin/bash", "-c", "set -o pipefail; curl -fsSL '"+panelInstallURL+"' | UPDATE_MODE=1 bash")
+			defer func() {
+				updateMu.Lock()
+				updateRunning = false
+				updateMu.Unlock()
+			}()
+			cmd := exec.Command("/bin/bash", "-c",
+				"set -o pipefail; curl -fsSL '"+panelInstallURL+"' | UPDATE_MODE=1 bash")
 			cmd.Stdout = f
 			cmd.Stderr = f
+			cmd.Env = append(os.Environ(),
+				"PATH="+defaultString(os.Getenv("PATH"), "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"))
 			if err := cmd.Run(); err != nil {
 				fmt.Fprintf(f, "update failed: %v\n", err)
 				return
@@ -3773,6 +3797,44 @@ func updateRunHandler(configPath string) http.HandlerFunc {
 		}()
 		writeJSON(w, map[string]any{"started": true, "log": logFile})
 	}
+}
+
+var (
+	updateMu      sync.Mutex
+	updateRunning bool
+)
+
+func updateLogHandler(configPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", http.MethodGet)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		updateMu.Lock()
+		running := updateRunning
+		updateMu.Unlock()
+		log := ""
+		if data, err := os.ReadFile(filepath.Join(filepath.Dir(configPath), "update.log")); err == nil {
+			log = readTail(string(data), 64<<10)
+		}
+		writeJSON(w, map[string]any{
+			"running": running,
+			"current": currentPanelVersion(configPath),
+			"log":     log,
+		})
+	}
+}
+
+func readTail(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	s = s[len(s)-max:]
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = s[i+1:]
+	}
+	return s
 }
 
 func readEnvFile(path string) (map[string]string, error) {
